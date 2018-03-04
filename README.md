@@ -1,8 +1,11 @@
 # C-sharp-Job-System-Sample
 
-C# Job Systemのサンプルです。
-基本的にすべて同じ挙動をするはずです。
-段階的にC# Job Systemへ移行しています
+C# Job Systemのサンプルです。  
+基本的にすべて同じ挙動をするはずです。  
+段階的にC# Job Systemへ移行しています  
+
+このプロジェクトは、下のブログ記事説明用です。  
+[【Unity】C# Job Systemを自分なりに解説してみる](http://tsubakit1.hateblo.jp/entry/2018/03/04/223804)
 
 ![ジョブ氏のサンプル](https://github.com/tsubaki/C-sharp-Job-System-Sample/blob/master/img/image.gif?raw=true)
 
