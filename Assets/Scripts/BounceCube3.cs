@@ -42,7 +42,7 @@ public sealed class BounceCube3 : MonoBehaviour
 		handle.Complete();
 
 		// Raycastの開始点と位置を設定
-		for(int i=0; i<transformArray.Length; i++)
+		for(int i=0; i<transformArray.length; i++)
 		{
 			var targetPosition = transformArray[i].position;
 			var direction = Vector3.down;
@@ -65,7 +65,7 @@ public sealed class BounceCube3 : MonoBehaviour
 		// 並列処理を実行（即完了待ち）
 		// 終わったらコマンドに使ったバッファは不要なので破棄
 		var raycastJobHandle = RaycastCommand.ScheduleBatch(commands, results, 20);
-		var updatePositionHandle = updatePositionJob.Schedule(transformArray.Length, 20, raycastJobHandle );
+		var updatePositionHandle = updatePositionJob.Schedule(transformArray.length, 20, raycastJobHandle );
 		handle = applyPosition.Schedule(transformArray, updatePositionHandle);
 	}
 

@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.Jobs;
 using Unity.Jobs;
 
-public sealed class BounceCube4 : MonoBehaviour 
+public sealed class BounceCube5 : MonoBehaviour 
 {
 	[SerializeField] Transform[] targets;
 
