@@ -11,12 +11,13 @@ public sealed class BounceCube5 : MonoBehaviour
 
 	NativeArray<float> velocity;
 	NativeArray<RaycastCommand> commands;
-	NativeArray<RaycastHit> results;
+    NativeArray<RaycastHit> results;
+    NativeQueue<int> hitQueue;
 	TransformAccessArray transformArray ;
 
 	IsHitGroundJob hitCheckJob;
 
-	JobHandle handle, hitcheckHandle;
+	JobHandle handle;
 
 	[SerializeField] CanvasGroup group;
 
@@ -24,8 +25,12 @@ public sealed class BounceCube5 : MonoBehaviour
 	{
 		velocity = new NativeArray<float>(targets.Length, Allocator.Persistent);
 		commands = new NativeArray<RaycastCommand>(targets.Length, Allocator.Persistent);
-		results = new NativeArray<RaycastHit>(targets.Length, Allocator.Persistent);
-		for(int i=0; i< targets.Length; i++)
+        results = new NativeArray<RaycastHit>(targets.Length, Allocator.Persistent);
+        hitQueue = new NativeQueue<int>(Allocator.Persistent);
+
+        transform.DetachChildren();
+
+        for (int i=0; i< targets.Length; i++)
 		{
 			velocity[i] = -1;
 		}
@@ -34,28 +39,25 @@ public sealed class BounceCube5 : MonoBehaviour
 		hitCheckJob = new IsHitGroundJob()
 		{
 			raycastResults = results,
-			result = new NativeArray<int>(1, Allocator.Persistent)
-		};
+			result = hitQueue.ToConcurrent()
+        };
 
 	}
 
 	void OnDisable()
 	{
 		handle.Complete();
-		hitcheckHandle.Complete();
+
 		velocity.Dispose();
 		commands.Dispose();
 		results.Dispose();
-		hitCheckJob.result.Dispose();
-		transformArray.Dispose();
+        hitQueue.Dispose();
+        transformArray.Dispose();
 	}
 
-	void Update()
+	void LateUpdate()
 	{
 		handle.Complete();
-		hitcheckHandle.Complete();
-
-		group.alpha = hitCheckJob.result[0];
 
 		// Raycastの開始点と位置を設定
 		for(int i=0; i<transformArray.length; i++)
@@ -67,9 +69,8 @@ public sealed class BounceCube5 : MonoBehaviour
 		}
 
 		// 移動のコマンドを設定
-		var updatePositionJob = new UpdatePosition()
+		var updatePositionJob = new UpdateVelocity()
 		{
-			raycastResults = results,
 			velocitys = velocity
 		};
 
@@ -79,35 +80,30 @@ public sealed class BounceCube5 : MonoBehaviour
 		};
 
 
-		// 並列処理を実行（即完了待ち）
-		// 終わったらコマンドに使ったバッファは不要なので破棄
-		var raycastJobHandle = RaycastCommand.ScheduleBatch(commands, results, 20);
-		hitcheckHandle = hitCheckJob.Schedule(raycastJobHandle);
-		var updatePositionHandle = updatePositionJob.Schedule(transformArray.length, 20, raycastJobHandle );
-		handle = applyPosition.Schedule(transformArray, updatePositionHandle);
+        // 並列処理を実行（即完了待ち）
+        // 終わったらコマンドに使ったバッファは不要なので破棄
+        handle = RaycastCommand.ScheduleBatch(commands, results, 20);
+        handle = hitCheckJob.Schedule(transformArray.length, 20, handle);
+        handle = new ReflectionJob { velocitys = velocity, result=hitQueue }.Schedule(handle);
+        handle = updatePositionJob.Schedule(transformArray.length, 20, handle);
+		handle = applyPosition.Schedule(transformArray, handle);
 
-        JobHandle.ScheduleBatchedJobs();
+        handle.Complete();
 	}
 
-    struct UpdatePosition : IJobParallelFor
+    struct UpdateVelocity : IJobParallelFor
     {
-		[ReadOnly] public NativeArray<RaycastHit> raycastResults;
 		public NativeArray<float> velocitys;
 
         void IJobParallelFor.Execute(int index)
         {
-			if(	velocitys[index] < 0 && 
-				raycastResults[index].distance < 0.5f)
-			{
-				velocitys[index] = 2;
-			}
 			velocitys[index] -= 0.098f ;
         }
     }
 
     struct ApplyPosition : IJobParallelForTransform
     {
-		public NativeArray<float> velocitys;
+        [ReadOnly] public NativeArray<float> velocitys;
 
         void IJobParallelForTransform.Execute(int index, TransformAccess transform)
         {
@@ -115,22 +111,31 @@ public sealed class BounceCube5 : MonoBehaviour
         }
     }
 
-    struct IsHitGroundJob : IJob
+    struct IsHitGroundJob : IJobParallelFor
     {
 		[ReadOnly] public NativeArray<RaycastHit> raycastResults;
-		[WriteOnly] public NativeArray<int> result;
-		
-        void IJob.Execute()
+		[WriteOnly] public NativeQueue<int>.Concurrent result;
+
+        void IJobParallelFor.Execute(int index)
         {
-			for(int i=0; i<raycastResults.Length; i++)
-			{
-				if( raycastResults[i].distance < 1f)
-				{
-					result[0] = 0;
-					return;
-				}
-			}
-			result[0] = 1;
+            if (raycastResults[index].distance < 1f)
+            {
+                result.Enqueue(index);
+            }
+        }
+    }
+
+    struct ReflectionJob : IJob
+    {
+        public NativeQueue<int> result;
+        public NativeArray<float> velocitys;
+
+        public void Execute()
+        {
+            while(result.TryDequeue(out int index))
+            {
+                velocitys[index] = 2;
+            }
         }
     }
 }
