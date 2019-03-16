@@ -86,7 +86,7 @@ public sealed class BounceCube5 : MonoBehaviour
 		var updatePositionHandle = updatePositionJob.Schedule(transformArray.length, 20, raycastJobHandle );
 		handle = applyPosition.Schedule(transformArray, updatePositionHandle);
 
-
+        JobHandle.ScheduleBatchedJobs();
 	}
 
     struct UpdatePosition : IJobParallelFor
